@@ -14,12 +14,7 @@ COPY . .
 # Create directories
 RUN mkdir -p data/logs storage
 
-ENV PORT=8080
+# Railway inject PORT เอง ไม่ต้อง set ที่นี่
 EXPOSE 8080
 
 CMD ["python", "-m", "app.main"]
-
-ENV GOOGLE_SHEETS_ID=1t715T22T8NhfaZRpjfR0zHDfcHqTq3EutG49xgGH8HU
-ENV GOOGLE_SHEETS_CREDENTIALS=/app/credentials.json
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
-
