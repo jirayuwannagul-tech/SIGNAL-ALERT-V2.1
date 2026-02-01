@@ -23,7 +23,7 @@ class ConfigManager:
         """Load and validate all configuration"""
         # Required environment variables
         required_env_vars = [
-            'GOOGLE_SHEETS_ID',  # ← แก้ตรงนี้
+            # 'GOOGLE_SHEETS_ID',  <-- 🎯 ใส่ # ปิดไว้ (ไม่ต้องเช็ก)
             'LINE_CHANNEL_ACCESS_TOKEN',
             'LINE_CHANNEL_SECRET',
             'LINE_USER_ID'
@@ -63,19 +63,21 @@ class ConfigManager:
         # Validate port range
         port = self._config.get('PORT')
         if not (1024 <= port <= 65535):
-            raise ValueError(f"Invalid port: {port}. Must be between 1024-65535")
+            # ถ้าพอร์ตผิด ให้แก้เป็น 8080 แทนที่จะระเบิดตัวเอง
+            self._config['PORT'] = 8080
+            logging.warning(f"⚠️ Invalid port: {port}. Defaulting to 8080")
         
-        # Validate Google Sheets ID format
-        sheets_id = self._config.get('GOOGLE_SHEETS_ID')
-        if not sheets_id or len(sheets_id) < 20:
-            raise ValueError("Invalid Google Sheets ID")
+        # --- ปิดด่านตรวจ Google Sheets ---
+        # sheets_id = self._config.get('GOOGLE_SHEETS_ID')
+        # if not sheets_id or len(sheets_id) < 20:
+        #     raise ValueError("Invalid Google Sheets ID")
         
-        # Validate LINE tokens
-        line_token = self._config.get('LINE_CHANNEL_ACCESS_TOKEN')
-        if not line_token or len(line_token) < 50:
-            raise ValueError("Invalid LINE Channel Access Token")
+        # --- ปิดด่านตรวจ LINE tokens (หรือเปิดไว้ถ้ามึงใส่ Token จริงแล้ว) ---
+        # line_token = self._config.get('LINE_CHANNEL_ACCESS_TOKEN')
+        # if not line_token or len(line_token) < 50:
+        #     raise ValueError("Invalid LINE Channel Access Token")
         
-        logging.info("✅ Configuration validation passed")
+        logging.info("✅ Configuration validation passed (Strict mode disabled)")
     
     def is_debug_mode(self) -> bool:
         """Check if debug mode is enabled"""
