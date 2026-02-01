@@ -97,8 +97,10 @@ def initialize_services_background():
             
         try:
             google_config = services["config_manager"].get_google_config()
-            services["sheets_logger"] = SheetsLogger(google_config)
-            logger.info("✅ SheetsLogger initialized with ConfigManager")
+            # 👇 ใส่ # ไว้หน้า 2 บรรทัดนี้
+            # services["sheets_logger"] = SheetsLogger(google_config)
+            # logger.info("✅ SheetsLogger initialized with ConfigManager")
+            services["sheets_logger"] = None # 👈 เพิ่มบรรทัดนี้เพื่อให้ระบบรู้ว่าไม่ต้องใช้
         except Exception as e:
             logger.warning(f"⚠️ SheetsLogger failed to initialize: {e}")
             services["sheets_logger"] = None
