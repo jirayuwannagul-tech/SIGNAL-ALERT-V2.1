@@ -288,6 +288,40 @@ def test_line_notification():
             "error": str(e)
         }), 500
 
+@app.route('/api/line/webhook', methods=['POST'])
+def line_webhook():
+    """รับ webhook จาก LINE เพื่อดู Group ID"""
+    try:
+        # ดึง signature และ body จาก request
+        signature = request.headers.get('X-Line-Signature')
+        body = request.get_data(as_text=True)
+        
+        logger.info(f"📥 Received LINE webhook")
+        
+        # แปลง JSON body เป็น dict
+        import json
+        data = json.loads(body)
+        
+        # วนลูปดู events ที่ได้รับ
+        for event in data.get('events', []):
+            # เช็กว่ามาจากกลุ่มหรือไม่
+            source = event.get('source', {})
+            
+            if source.get('type') == 'group':
+                # 🎯 นี่คือ Group ID ที่เราต้องการ!
+                group_id = source.get('groupId')
+                
+                # แสดง log
+                logger.info(f"🎯 GROUP ID FOUND: {group_id}")
+                logger.info(f"📝 Message Type: {event.get('type')}")
+                logger.info(f"💬 Text: {event.get('message', {}).get('text', 'N/A')}")
+                
+        return jsonify({"status": "ok"}), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Webhook error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/startup")
 def startup_probe():
     """Startup probe - always return OK for Cloud Run"""

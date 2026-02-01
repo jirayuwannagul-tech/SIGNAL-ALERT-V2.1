@@ -200,8 +200,8 @@ class TechnicalIndicators:
     def rsi_extreme(
         df: pd.DataFrame,
         period: int = 14,
-        low_threshold: float = 40,   # ⭐ เปลี่ยนจาก 30 เป็น 40
-        high_threshold: float = 60,  # ⭐ เปลี่ยนจาก 70 เป็น 60
+        low_threshold: float = 35,   # ✅ ปรับจาก 40 เป็น 35 (ต้องขายหนักจริงๆ ถึงจะน่าสะสม)
+        high_threshold: float = 65,  # ✅ ปรับจาก 60 เป็น 65 (ต้องซื้อหนักจริงๆ ถึงจะน่าระวัง)
     ) -> Tuple[float, str, Dict]:
         """
         RSI โต่ง (Extreme RSI) calculation for identifying overbought/oversold conditions.

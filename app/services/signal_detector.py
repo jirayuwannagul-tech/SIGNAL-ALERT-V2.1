@@ -47,17 +47,17 @@ class SignalDetector:
             }
     
     def _load_indicator_config(self) -> Dict:
-        """Load indicator configuration"""
         try:
             return {
                 "squeeze": {"length": 20, "bb_mult": 2.0, "kc_mult": 1.5},
                 "macd": {"fast": 8, "slow": 17, "signal": 9}, 
                 "rsi": {
                     "period": 14, 
-                    "oversold": 40,
-                    "overbought": 60
+                    "oversold": 35,  # ✅ แก้จาก 40 เป็น 35
+                    "overbought": 65 # ✅ แก้จาก 60 เป็น 65
                 }
             }
+            
         except Exception as e:
             logger.warning(f"Error loading indicator config, using defaults: {e}")
             return {
@@ -74,6 +74,9 @@ class SignalDetector:
 
             # Get data from DataManager
             df = self.data_manager.get_klines(symbol, timeframe, limit=100)
+
+            df_1d = self.data_manager.get_klines(symbol, "1d", limit=50)
+            trend_1d = self._detect_signals_improved_fixed(None, "1d", df_1d)
 
             if df is None:
                 logger.warning(f"No data available for {symbol} {timeframe}")
@@ -94,12 +97,10 @@ class SignalDetector:
             analysis = self.indicators.analyze_all_indicators(df, self.indicator_settings)
 
             # Detect trading signals with CONSERVATIVE logic
-            signals = self._detect_signals_improved_fixed(analysis, timeframe, df)
+            signals = self._detect_signals_improved_fixed(analysis, timeframe, df, trend_1d=trend_1d)
 
             # Calculate risk management levels  
-            risk_levels = self._calculate_risk_levels(
-                analysis["current_price"], timeframe, signals
-            )
+            risk_levels = self._calculate_risk_levels(analysis["current_price"], timeframe, signals, symbol)
 
             # Handle position creation with duplicate prevention
             position_created = self._handle_signal_position_fixed(
@@ -245,14 +246,14 @@ class SignalDetector:
             logger.error(f"Error handling signal position: {e}")
             return False
 
-    def _detect_signals_improved_fixed(self, analysis: Dict, timeframe: str = "1d", df=None) -> Dict[str, bool]:
+    def _detect_signals_improved_fixed(self, analysis: Dict, timeframe: str = "1d", df=None, trend_1d=None) -> Dict[str, bool]:# รวมเงื่อนไข: Original OR Strong Momentum# รวมเงื่อนไข: Original OR Strong Momentum# รวมเงื่อนไข: Original OR Strong Momentum# รวมเงื่อนไข: Original OR Strong Momentum
         """
         1D: CDC ActionZone (EMA 12/26 Crossover)
         4H: RSI + MACD + Enhanced filters + STRONG MOMENTUM MODE
         """
         try:
             import pandas as pd
-            
+
             # Validate
             if df is None or 'close' not in df.columns:
                 logger.warning("Invalid dataframe")
@@ -398,6 +399,23 @@ class SignalDetector:
                 # ========================================
                 buy_signal = original_buy or strong_momentum_buy
                 short_signal = original_short or strong_momentum_short
+
+                # --- 🆕 เงื่อนไขที่ 5: Multi-Timeframe Filter (ล็อคกุญแจตามเทรนด์ 1D) ---
+                if timeframe == "4h" and trend_1d:
+                    # เก็บค่าเดิมไว้เช็คเพื่อทำ Log
+                    raw_buy = buy_signal
+                    raw_short = short_signal
+                    
+                    # กรองด้วยเทรนด์ 1D
+                    buy_signal = buy_signal and trend_1d.get("buy", False)
+                    short_signal = short_signal and trend_1d.get("short", False)
+                    
+                    # Log แจ้งเตือนถ้าโดนบล็อกสัญญาณ
+                    if raw_buy and not buy_signal:
+                        logger.info(f"🚫 {symbol} LONG Blocked by 1D Trend (CDC is RED)")
+                    if raw_short and not short_signal:
+                        logger.info(f"🚫 {symbol} SHORT Blocked by 1D Trend (CDC is GREEN)")
+                # ------------------------------------------------------------------
                 
                 # ========================================
                 # 📊 LOGGING
@@ -503,7 +521,7 @@ class SignalDetector:
         else:
             return 0
 
-    def _calculate_risk_levels(self, current_price: float, timeframe: str, signals: Dict) -> Dict:
+    def _calculate_risk_levels(self, current_price: float, timeframe: str, signals: Dict, symbol: str) -> Dict:
         """Calculate Stop Loss and Take Profit levels"""
         try:
             risk_config = self.risk_management.get(
@@ -511,7 +529,22 @@ class SignalDetector:
             )
 
             tp_percentages = risk_config.get("tp_levels", [3.0, 5.0, 7.0])
-            sl_percentage = risk_config.get("sl_level", 3.0)
+            
+            # --- 🆕 เริ่มส่วนที่แก้ไขใหม่: คำนวณ SL ตามความซิ่ง (Volatility) ---
+            # ดึงข้อมูล 10 แท่งล่าสุดมาดูระยะเหวี่ยง (ใช้ข้อมูลจาก signals หรือ symbol ที่เกี่ยวข้อง)
+            symbol = symbol
+            df_recent = self.data_manager.get_klines(symbol, timeframe, limit=10)
+            
+            if df_recent is not None and not df_recent.empty:
+                # คำนวณความเหวี่ยงเฉลี่ยเป็น % (High-Low)
+                volatility = ((df_recent['high'] - df_recent['low']) / df_recent['close']).mean() * 100
+                # ใช้ 1.5 เท่าของความเหวี่ยง แต่ไม่ต่ำกว่า 2% และไม่เกิน 5%
+                sl_percentage = min(max(volatility * 1.5, 2.0), 5.0)
+                logger.info(f"🛡️ Dynamic SL set at {sl_percentage:.2f}% (Volatility: {volatility:.2f}%)")
+            else:
+                # ถ้าดึงข้อมูลไม่ได้ ให้ใช้ค่าจาก Config ตามเดิม
+                sl_percentage = risk_config.get("sl_level", 3.0)
+            # -----------------------------------------------------------
 
             risk_levels = {"timeframe": timeframe, "entry_price": current_price}
 
