@@ -738,6 +738,7 @@ if __name__ == "__main__":
         del os.environ['WERKZEUG_SERVER_FD']
         logger.info("Removed WERKZEUG_SERVER_FD from environment")
     
+    # ส่วนท้ายของไฟล์ main.py
     # --- ส่วนที่แก้ไขเพื่อดัก Error $PORT ---
     raw_port = os.environ.get("PORT", "8080")
     if raw_port == "$PORT" or not raw_port.isdigit():
@@ -749,6 +750,3 @@ if __name__ == "__main__":
     
     try:
         app.run(host="0.0.0.0", port=port, debug=False)
-    except Exception as e:
-        logger.error(f"💥 Failed to start Flask application: {e}")
-        raise
