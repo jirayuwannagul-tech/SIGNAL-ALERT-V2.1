@@ -1,7 +1,0 @@
-2025-09-19 12:15:51,909 - __main__ - INFO - Squeeze Bot starting up...
-2025-09-19 12:15:52,283 - app.services.position_tracker - INFO - No existing positions file found, starting fresh
-2025-09-19 12:15:52,283 - app.services.line_notifier - WARNING - LINE credentials not fully configured - notifications disabled
-2025-09-19 12:15:52,285 - app.services.scheduler - INFO - Signal scheduler initialized
-2025-09-19 12:15:52,285 - app.services.scheduler - INFO - Services injected into scheduler
-2025-09-19 12:15:52,285 - __main__ - INFO - Services initialized successfully
-2025-09-19 12:15:52,286 - app.services.scheduler - WARNING - Scheduler not running
