@@ -27,6 +27,7 @@ class ConfigManager:
             'LINE_CHANNEL_ACCESS_TOKEN',
             'LINE_CHANNEL_SECRET',
             'LINE_USER_ID'
+            'LINE_USER_ID'
         ]
         
         try:
