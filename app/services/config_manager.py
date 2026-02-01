@@ -26,7 +26,7 @@ class ConfigManager:
             # 'GOOGLE_SHEETS_ID',  <-- 🎯 ใส่ # ปิดไว้ (ไม่ต้องเช็ก)
             'LINE_CHANNEL_ACCESS_TOKEN',
             'LINE_CHANNEL_SECRET',
-            'LINE_USER_ID'
+            # 'LINE_USER_ID'
         ]
         
         try:
