@@ -48,6 +48,12 @@ def get_version():
 
 VERSION = get_version()
 
+raw_port = os.environ.get("PORT", "8080")
+if raw_port == "$PORT" or not raw_port.isdigit():
+    port = 8080 
+else:
+    port = int(raw_port)
+
 # Initialize Flask app
 app = Flask(__name__)
 
@@ -733,20 +739,12 @@ def debug_positions():
 
 
 if __name__ == "__main__":
-    # Fix WERKZEUG error  
-    if 'WERKZEUG_SERVER_FD' in os.environ:
-        del os.environ['WERKZEUG_SERVER_FD']
-        logger.info("Removed WERKZEUG_SERVER_FD from environment")
-    
-    # ส่วนท้ายของไฟล์ main.py
-    # --- ส่วนที่แก้ไขเพื่อดัก Error $PORT ---
-    raw_port = os.environ.get("PORT", "8080")
-    if raw_port == "$PORT" or not raw_port.isdigit():
-        port = 8080 # ถ้าเป็นตัวหนังสือ ให้บังคับใช้ 8080 ทันที
-    else:
-        port = int(raw_port)
+    # ลบพวก raw_port = ... และ if raw_port == ... ทิ้งให้หมด
     
     logger.info(f"🚀 Starting SIGNAL-ALERT {VERSION} on port {port}")
     
     try:
         app.run(host="0.0.0.0", port=port, debug=False)
+    except Exception as e:
+        logger.error(f"💥 Failed to start Flask application: {e}")
+        raise
