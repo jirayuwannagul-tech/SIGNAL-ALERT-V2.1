@@ -738,8 +738,13 @@ if __name__ == "__main__":
         del os.environ['WERKZEUG_SERVER_FD']
         logger.info("Removed WERKZEUG_SERVER_FD from environment")
     
-    # Start Flask application
-    port = int(os.environ.get("PORT", 8080))
+    # --- ส่วนที่แก้ไขเพื่อดัก Error $PORT ---
+    raw_port = os.environ.get("PORT", "8080")
+    if raw_port == "$PORT" or not raw_port.isdigit():
+        port = 8080 # ถ้าเป็นตัวหนังสือ ให้บังคับใช้ 8080 ทันที
+    else:
+        port = int(raw_port)
+    
     logger.info(f"🚀 Starting SIGNAL-ALERT {VERSION} on port {port}")
     
     try:
