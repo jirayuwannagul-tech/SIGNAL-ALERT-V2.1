@@ -414,7 +414,7 @@ class SignalDetector:
                     if raw_buy and not buy_signal:
                         logger.info(f"🚫 {symbol} LONG Blocked by 1D Trend (CDC is RED)")
                     if raw_short and not short_signal:
-                        logger.info(f"🚫 {symbol} SHORT Blocked by 1D Trend (CDC is GREEN)")
+                        logger.info(f"🚫 {data.get('symbol')} SHORT Blocked by 1D Trend (CDC is GREEN)")
                 # ------------------------------------------------------------------
                 
                 # ========================================
