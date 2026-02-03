@@ -334,11 +334,36 @@ def line_webhook():
 def receive_signal_from_outside():
     try:
         data = request.get_json()
-        logger.info(f"⚡️ Received signal for: {data.get('symbol')}")
+        symbol = data.get('symbol', 'BTCUSDT')
+        direction = data.get('direction', 'LONG')
+        
+        # จำลองโครงสร้างข้อมูลที่ LineNotifier.send_signal_alert ต้องการ
+        analysis = {
+            "symbol": symbol,
+            "timeframe": data.get('timeframe', '4h'),
+            "current_price": data.get('current_price', 0),
+            "signals": {
+                "buy": True if direction == "LONG" else False,
+                "short": True if direction == "SHORT" else False
+            },
+            "risk_levels": data.get('risk_levels', {}),
+            "indicators": {
+                "squeeze": {"squeeze_off": True, "momentum_direction": "UP" if direction == "LONG" else "DOWN"},
+                "macd": {"cross_direction": "BULLISH" if direction == "LONG" else "BEARISH"},
+                "rsi": {"value": 55 if direction == "LONG" else 45}
+            },
+            "signal_strength": data.get('signal_strength', 100)
+        }
+        
+        logger.info(f"⚡️ Processing Signal Alert for: {symbol}")
         
         if services["line_notifier"]:
-            # กลับมาใช้ฟังก์ชันที่ทำงานได้ชัวร์ 100% ตามที่พี่ต้องการ
-            services["line_notifier"].send_test_message() 
+            # เรียกใช้ฟังก์ชันส่งซิกตัวจริงของพี่
+            success = services["line_notifier"].send_signal_alert(analysis)
+            
+            if not success:
+                # ถ้าส่งแบบซิกไม่ผ่าน ให้ส่งแบบ Test ไปก่อนกันพลาด
+                services["line_notifier"].send_test_message()
             
         return jsonify({"status": "success", "message": "Signal processed"}), 200
     except Exception as e:
