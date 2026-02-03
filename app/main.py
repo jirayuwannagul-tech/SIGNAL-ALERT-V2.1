@@ -332,21 +332,19 @@ def line_webhook():
 
 @app.route('/receive-signal', methods=['POST'])
 def receive_signal_from_outside():
-    """ประตูใหม่สำหรับรับสัญญาณจาก curl หรือ TradingView"""
     try:
         data = request.get_json()
-        logger.info(f"⚡️ Received signal from outside: {data.get('symbol')}")
+        logger.info(f"⚡️ Received signal for: {data.get('symbol')}")
         
         if services["line_notifier"]:
-            # บังคับส่ง LINE ทันที
-            # (ตรวจสอบว่าใน LineNotifier มีฟังก์ชัน send_signal_message หรือชื่อที่ใกล้เคียงกัน)
-            services["line_notifier"].send_message(f"🟢 สัญญาณใหม่: {data.get('symbol')}\nทิศทาง: {data.get('direction')}\nราคา: {data.get('current_price')}")
+            # กลับมาใช้ฟังก์ชันที่ทำงานได้ชัวร์ 100% ตามที่พี่ต้องการ
+            services["line_notifier"].send_test_message() 
             
         return jsonify({"status": "success", "message": "Signal processed"}), 200
     except Exception as e:
         logger.error(f"❌ Error in receive_signal: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500        
-
+        return jsonify({"status": "error", "message": str(e)}), 500
+        
 @app.route("/startup")
 def startup_probe():
     """Startup probe - always return OK for Cloud Run"""
