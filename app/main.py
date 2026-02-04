@@ -334,19 +334,39 @@ def line_webhook():
 def receive_signal_from_outside():
     try:
         data = request.get_json()
-        symbol = data.get('symbol', 'BTCUSDT')
-        direction = data.get('direction', 'LONG')
+        symbol = data.get('symbol', 'UNKNOWN')
+        direction = data.get('direction', 'LONG').upper()
+        price = data.get('current_price', 0)
+        risk = data.get('risk_levels', {})
         
-        # จำลองโครงสร้างข้อมูลที่ LineNotifier.send_signal_alert ต้องการ
+        # --- เพิ่มส่วนคำนวณ R:R ตรงนี้ครับพี่ ---
+        entry = risk.get('entry_price', price)
+        sl = risk.get('stop_loss', 0)
+        tp1 = risk.get('take_profit_1', 0)
+        
+        rr_ratio = 0.0
+        if entry and sl and tp1 and (entry != sl):
+            risk_amt = abs(entry - sl)
+            reward_amt = abs(tp1 - entry)
+            rr_ratio = reward_amt / risk_amt if risk_amt > 0 else 0
+        # -----------------------------------
+
         analysis = {
             "symbol": symbol,
-            "timeframe": data.get('timeframe', '4h'),
-            "current_price": data.get('current_price', 0),
+            "timeframe": data.get('timeframe', '4H'),
+            "current_price": price,
             "signals": {
                 "buy": True if direction == "LONG" else False,
                 "short": True if direction == "SHORT" else False
             },
-            "risk_levels": data.get('risk_levels', {}),
+            "risk_levels": {
+                "entry_price": entry,
+                "stop_loss": sl,
+                "take_profit_1": tp1,
+                "take_profit_2": risk.get('take_profit_2', 0),
+                "take_profit_3": risk.get('take_profit_3', 0),
+                "risk_reward_ratio": rr_ratio  # ส่งค่าที่คำนวณแล้วไปให้บอท
+            },
             "indicators": {
                 "squeeze": {"squeeze_off": True, "momentum_direction": "UP" if direction == "LONG" else "DOWN"},
                 "macd": {"cross_direction": "BULLISH" if direction == "LONG" else "BEARISH"},
@@ -355,19 +375,12 @@ def receive_signal_from_outside():
             "signal_strength": data.get('signal_strength', 100)
         }
         
-        logger.info(f"⚡️ Processing Signal Alert for: {symbol}")
-        
         if services["line_notifier"]:
-            # เรียกใช้ฟังก์ชันส่งซิกตัวจริงของพี่
-            success = services["line_notifier"].send_signal_alert(analysis)
+            services["line_notifier"].send_signal_alert(analysis)
             
-            if not success:
-                # ถ้าส่งแบบซิกไม่ผ่าน ให้ส่งแบบ Test ไปก่อนกันพลาด
-                services["line_notifier"].send_test_message()
-            
-        return jsonify({"status": "success", "message": "Signal processed"}), 200
+        return jsonify({"status": "success", "message": "Signal processed", "rr": rr_ratio}), 200
     except Exception as e:
-        logger.error(f"❌ Error in receive_signal: {e}")
+        logger.error(f"❌ Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
         
 @app.route("/startup")
