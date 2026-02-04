@@ -62,7 +62,7 @@ class LineNotifier:
         symbol = analysis.get("symbol", "UNKNOWN")
         try:
             # 🚨 1. ส่งต่อให้จ่าเฉย (ทำก่อนเลย)
-            jachey_url = "https://web-production-82bfc.app.railway.app/callback" # เช็ค URL อีกทีนะครับ
+            jachey_url = "https://web-production-82bfc.up.railway.app/callback" # เช็ค URL อีกทีนะครับ
             try:
                 # ส่ง data ทั้งก้อน (analysis) ไปให้จ่าเลย
                 requests.post(jachey_url, json=analysis, timeout=5)
