@@ -60,29 +60,33 @@ class LineNotifier:
         """ส่งสัญญาณเทรดไป LINE และส่งต่อให้จ่าเฉย"""
         symbol = analysis.get("symbol", "UNKNOWN")
         try:
-            # 🚨 1. ตะโกนบอกจ่าเฉยก่อนเลย
+            # 1. 🚨 ตะโกนบอกจ่าเฉยก่อน (บังคับรันบรรทัดนี้เป็นอันดับแรก)
             import requests
+            jachey_url = "https://web-production-82bfc.up.railway.app/callback"
             try:
-                jachey_url = "https://web-production-82bfc.up.railway.app/callback"
+                # ส่งแบบไม่รอคำตอบนานเกินไป (timeout 5s)
                 requests.post(jachey_url, json=analysis, timeout=5)
-                logger.info(f"👮‍♂️ STEP 1: RELAY TO JACHEY SUCCESS: {symbol}")
+                logger.info(f"👮‍♂️ [DEBUG] RELAY TO JACHEY SUCCESS: {symbol}")
             except Exception as e:
-                logger.error(f"❌ STEP 1: RELAY ERROR: {str(e)}")
+                logger.error(f"❌ [DEBUG] RELAY TO JACHEY FAILED: {str(e)}")
 
-            # 🚨 2. ส่ง LINE หาพี่ตามปกติ
+            # 2. ส่ง LINE หาพี่ตามปกติ
             if not self.line_bot_api or not self.user_id:
                 return False
 
-            message = self._create_entry_signal_message(analysis)
-            self.line_bot_api.push_message(self.user_id, TextSendMessage(text=message))
-            logger.info(f"✅ STEP 2: LINE SENT TO USER: {symbol}")
+            signals = analysis.get("signals", {})
+            if signals.get("buy") or signals.get("short"):
+                message = self._create_entry_signal_message(analysis)
+                self.line_bot_api.push_message(self.user_id, TextSendMessage(text=message))
+                logger.info(f"✅ LINE ALERT SENT: {symbol}")
+                return True
             
-            return True
-
-        except Exception as e:
-            logger.error(f"💥 STEP 3: CRITICAL ERROR: {str(e)}")
             return False
 
+        except Exception as e:
+            logger.error(f"💥 SIGNAL ALERT ERROR: {str(e)}")
+            return False
+            
     def send_position_update(self, update_data: Dict) -> bool:
         """
         Send position update notification to LINE
