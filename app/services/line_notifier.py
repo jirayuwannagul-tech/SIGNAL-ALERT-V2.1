@@ -1,5 +1,6 @@
 """LINE Bot notification service for trading signals - REFACTORED for v2.0"""
 import logging
+import requests
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -60,17 +61,16 @@ class LineNotifier:
         """ส่งสัญญาณเทรดไป LINE และส่งต่อให้จ่าเฉย"""
         symbol = analysis.get("symbol", "UNKNOWN")
         try:
-            # 1. 🚨 ตะโกนบอกจ่าเฉยก่อน (บังคับรันบรรทัดนี้เป็นอันดับแรก)
-            import requests
-            jachey_url = "https://web-production-82bfc.up.railway.app/callback"
+            # 🚨 1. ส่งต่อให้จ่าเฉย (ทำก่อนเลย)
+            jachey_url = "https://web-production-82bfc.app.railway.app/callback" # เช็ค URL อีกทีนะครับ
             try:
-                # ส่งแบบไม่รอคำตอบนานเกินไป (timeout 5s)
+                # ส่ง data ทั้งก้อน (analysis) ไปให้จ่าเลย
                 requests.post(jachey_url, json=analysis, timeout=5)
-                logger.info(f"👮‍♂️ [DEBUG] RELAY TO JACHEY SUCCESS: {symbol}")
+                logger.info(f"👮‍♂️ [RELAY] ข้อมูลถึงจ่าเฉยแล้ว: {symbol}")
             except Exception as e:
-                logger.error(f"❌ [DEBUG] RELAY TO JACHEY FAILED: {str(e)}")
+                logger.error(f"❌ [RELAY] ส่งหาจ่าพลาด: {str(e)}")
 
-            # 2. ส่ง LINE หาพี่ตามปกติ
+            # 🚨 2. ส่ง LINE หาพี่ (โค้ดเดิม)
             if not self.line_bot_api or not self.user_id:
                 return False
 
@@ -80,13 +80,12 @@ class LineNotifier:
                 self.line_bot_api.push_message(self.user_id, TextSendMessage(text=message))
                 logger.info(f"✅ LINE ALERT SENT: {symbol}")
                 return True
-            
             return False
 
         except Exception as e:
-            logger.error(f"💥 SIGNAL ALERT ERROR: {str(e)}")
+            logger.error(f"💥 ERROR: {str(e)}")
             return False
-            
+
     def send_position_update(self, update_data: Dict) -> bool:
         """
         Send position update notification to LINE
