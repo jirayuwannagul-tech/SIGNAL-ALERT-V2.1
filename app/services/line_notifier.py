@@ -59,30 +59,35 @@ class LineNotifier:
     def send_signal_alert(self, analysis: Dict) -> bool:
         """ส่งสัญญาณเทรดไป LINE และส่งต่อให้จ่าเฉย"""
         try:
-            # 🚨 ส่วนที่เพิ่ม: ส่งต่อข้อมูล JSON ให้จ่าเฉย
-            try:
-                import requests
-                jachey_url = "https://web-production-82bfc.up.railway.app/callback"
-                requests.post(jachey_url, json=analysis, timeout=5)
-                logger.info(f"👮‍♂️ ส่งต่อข้อมูลให้จ่าเฉยสำเร็จ: {analysis.get('symbol')}")
-            except Exception as e:
-                logger.error(f"❌ ส่งต่อให้จ่าเฉยพลาด: {e}")
-
-            # --- โค้ดเดิมของพี่ ---
+            # 1. ส่ง LINE หาพี่ก่อน (โค้ดเดิม)
             if not self.line_bot_api or not self.user_id:
                 logger.warning("LINE not properly configured, cannot send signal alert")
                 return False
 
             signals = analysis.get("signals", {})
-            recommendation = analysis.get("recommendation", "")
-
             if signals.get("buy") or signals.get("short"):
                 message = self._create_entry_signal_message(analysis)
+                self.line_bot_api.push_message(self.user_id, TextSendMessage(text=message))
+                logger.info(f"✅ LINE alert sent for {analysis.get('symbol')}")
             else:
                 return False
 
-            self.line_bot_api.push_message(self.user_id, TextSendMessage(text=message))
+            # 2. 🚨 ส่วนส่งต่อให้จ่าเฉย (ย้ายมาไว้ข้างล่างเพื่อให้แน่ใจว่า LINE พี่ดังก่อน)
+            try:
+                import requests
+                jachey_url = "https://web-production-82bfc.up.railway.app/callback"
+                # ใส่ timeout 10 วินาทีกันเหนียว
+                resp = requests.post(jachey_url, json=analysis, timeout=10)
+                logger.info(f"👮‍♂️ Jachey Response: {resp.status_code} - {analysis.get('symbol')}")
+            except Exception as e:
+                logger.error(f"❌ Relay to Jachey FAILED: {str(e)}")
+
             return True
+
+        except Exception as e:
+            logger.error(f"💥 Critical error in send_signal_alert: {e}")
+            return False
+
     def send_position_update(self, update_data: Dict) -> bool:
         """
         Send position update notification to LINE
