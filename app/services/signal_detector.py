@@ -246,15 +246,15 @@ class SignalDetector:
             logger.error(f"Error handling signal position: {e}")
             return False
 
-    def _detect_signals_improved_fixed(self, analysis: Dict, timeframe: str = "1d", df=None, trend_1d=None) -> Dict[str, bool]:# รวมเงื่อนไข: Original OR Strong Momentum# รวมเงื่อนไข: Original OR Strong Momentum# รวมเงื่อนไข: Original OR Strong Momentum# รวมเงื่อนไข: Original OR Strong Momentum
+    def _detect_signals_improved_fixed(self, analysis: Dict, timeframe: str = "1d", df=None, trend_1d=None) -> Dict[str, bool]:
         """
         1D: CDC ActionZone (EMA 12/26 Crossover)
-        4H: RSI + MACD + Enhanced filters + STRONG MOMENTUM MODE
+        4H: RSI + MACD + Enhanced filters + STRONG MOMENTUM MODE + PULLBACK MODE
         """
         try:
             import pandas as pd
 
-            # Validate
+            # Validate dataframe
             if df is None or 'close' not in df.columns:
                 logger.warning("Invalid dataframe")
                 return {"buy": False, "short": False, "sell": False, "cover": False}
@@ -283,10 +283,7 @@ class SignalDetector:
                 ema_cross_down = (ema12_prev >= ema26_prev) and (ema12_curr < ema26_curr)
                 
                 # CDC ActionZone conditions
-                # GREEN: EMA12 > EMA26 AND Price > EMA12
                 buy_signal = ema_cross_up and (price_curr > ema12_curr)
-                
-                # RED: EMA12 < EMA26 AND Price < EMA12
                 short_signal = ema_cross_down and (price_curr < ema12_curr)
                 
                 # Log
@@ -302,10 +299,6 @@ class SignalDetector:
                         f"EMA12: {ema12_curr:.2f} < EMA26: {ema26_curr:.2f} | "
                         f"Price: {price_curr:.2f} < EMA12"
                     )
-                else:
-                    logger.debug(
-                        f"1D No signal | EMA12: {ema12_curr:.2f}, EMA26: {ema26_curr:.2f}"
-                    )
                 
                 return {
                     "buy": buy_signal,
@@ -315,20 +308,19 @@ class SignalDetector:
                 }
             
             # ========================================
-            # 4H: ORIGINAL + STRONG MOMENTUM MODE 🔥
+            # 4H: IMPROVED SIGNALS
             # ========================================
-            else:  # timeframe == "4h"
+            else:
                 if len(df) < 30:
                     logger.warning(f"Insufficient data: {len(df)} candles")
                     return {"buy": False, "short": False, "sell": False, "cover": False}
                 
-                # Calculate RSI(14)
+                # Calculate RSI
                 from ta.momentum import RSIIndicator
                 rsi_indicator = RSIIndicator(df['close'], window=14)
                 df['rsi'] = rsi_indicator.rsi()
                 df['rsi_ma'] = df['rsi'].rolling(window=14).mean()
                 
-                # RSI values
                 rsi_current = df['rsi'].iloc[-1]
                 rsi_ma_current = df['rsi_ma'].iloc[-1]
                 rsi_prev = df['rsi'].iloc[-2]
@@ -339,7 +331,7 @@ class SignalDetector:
                 macd_cross = macd_data.get("cross_direction", "NONE")
                 macd_line = macd_data.get("macd_line", 0)
                 
-                # 🆕 คำนวณ MACD ค่าก่อนหน้า (สำหรับ Strong Momentum)
+                # Calculate MACD previous value
                 from ta.trend import MACD
                 macd_indicator = MACD(df['close'], window_slow=17, window_fast=8, window_sign=9)
                 df['macd'] = macd_indicator.macd()
@@ -364,58 +356,74 @@ class SignalDetector:
                 original_buy = (
                     rsi_cross_up and 
                     macd_cross == "UP" and 
-                    macd_line > 0 and
+                    macd_line > -20 and        # ✅ แก้แล้ว: -20 แทน 0
                     squeeze_off
                 )
                 
                 original_short = (
                     rsi_cross_down and 
                     macd_cross == "DOWN" and 
-                    macd_line < 0 and
+                    macd_line < 20 and         # ✅ แก้แล้ว: 20 แทน 0
                     squeeze_off
                 )
                 
                 # ========================================
-                # 🔥 STRONG MOMENTUM MODE (Continuation)
+                # 🔥 STRONG MOMENTUM MODE
                 # ========================================
                 strong_momentum_buy = (
-                    rsi_current > 70 and           # RSI overbought มาก
-                    rsi_current > rsi_prev and     # RSI ยังขึ้นต่อ
-                    macd_line > 100 and            # MACD บวกลึก
-                    macd_line > macd_prev and      # MACD ยังขึ้นต่อ
-                    squeeze_off                     # Squeeze OFF
+                    rsi_current > 65 and           # ✅ ลดจาก 70
+                    rsi_current > rsi_prev and
+                    macd_line > 80 and             # ✅ ลดจาก 100
+                    macd_line > macd_prev and
+                    squeeze_off
                 )
                 
                 strong_momentum_short = (
-                    rsi_current < 30 and           # RSI oversold มาก
-                    rsi_current < rsi_prev and     # RSI ยังลงต่อ
-                    macd_line < -100 and           # MACD ติดลบลึก
-                    macd_line < macd_prev and      # MACD ยังลงต่อ
-                    squeeze_off                     # Squeeze OFF
+                    rsi_current < 35 and           # ✅ เพิ่มจาก 30
+                    rsi_current < rsi_prev and
+                    macd_line < -80 and            # ✅ เพิ่มจาก -100
+                    macd_line < macd_prev and
+                    squeeze_off
                 )
                 
                 # ========================================
-                # รวมเงื่อนไข: Original OR Strong Momentum
+                # 🆕 PULLBACK MODE
                 # ========================================
-                buy_signal = original_buy or strong_momentum_buy
-                short_signal = original_short or strong_momentum_short
-
-                # --- 🆕 เงื่อนไขที่ 5: Multi-Timeframe Filter (ล็อคกุญแจตามเทรนด์ 1D) ---
-                if timeframe == "4h" and trend_1d:
-                    # เก็บค่าเดิมไว้เช็คเพื่อทำ Log
+                pullback_buy = (
+                    macd_line > 50 and
+                    rsi_current > 45 and rsi_current < 55 and
+                    rsi_current > rsi_prev and
+                    squeeze_off
+                )
+                
+                pullback_short = (
+                    macd_line < -50 and
+                    rsi_current > 45 and rsi_current < 55 and
+                    rsi_current < rsi_prev and
+                    squeeze_off
+                )
+                
+                # ========================================
+                # รวมสัญญาณทั้ง 3 โหมด ✅
+                # ========================================
+                buy_signal = original_buy or strong_momentum_buy or pullback_buy
+                short_signal = original_short or strong_momentum_short or pullback_short
+                
+                # ========================================
+                # Multi-Timeframe Filter
+                # ========================================
+                if trend_1d:
                     raw_buy = buy_signal
                     raw_short = short_signal
                     
-                    # กรองด้วยเทรนด์ 1D
                     buy_signal = buy_signal and trend_1d.get("buy", False)
                     short_signal = short_signal and trend_1d.get("short", False)
                     
-                    # Log แจ้งเตือนถ้าโดนบล็อกสัญญาณ
+                    # Log ถ้าโดนบล็อก
                     if raw_buy and not buy_signal:
-                        logger.info(f"🚫 {symbol} LONG Blocked by 1D Trend (CDC is RED)")
+                        logger.info(f"🚫 LONG Blocked by 1D Trend (CDC is RED)")
                     if raw_short and not short_signal:
-                        logger.info(f"🚫 {data.get('symbol')} SHORT Blocked by 1D Trend (CDC is GREEN)")
-                # ------------------------------------------------------------------
+                        logger.info(f"🚫 SHORT Blocked by 1D Trend (CDC is GREEN)")
                 
                 # ========================================
                 # 📊 LOGGING
@@ -430,8 +438,15 @@ class SignalDetector:
                 elif strong_momentum_buy:
                     logger.info(
                         f"🔥 4H LONG (Strong Momentum) | "
-                        f"RSI: {rsi_current:.2f} (rising, >70) | "
-                        f"MACD: {macd_line:.6f} (rising, >100) | "
+                        f"RSI: {rsi_current:.2f} (rising, >65) | "
+                        f"MACD: {macd_line:.6f} (rising, >80) | "
+                        f"Squeeze: OFF"
+                    )
+                elif pullback_buy:
+                    logger.info(
+                        f"📈 4H LONG (Pullback) | "
+                        f"RSI: {rsi_current:.2f} (mid, rising) | "
+                        f"MACD: {macd_line:.6f} (>50) | "
                         f"Squeeze: OFF"
                     )
                 elif original_short:
@@ -444,8 +459,15 @@ class SignalDetector:
                 elif strong_momentum_short:
                     logger.info(
                         f"🔥 4H SHORT (Strong Momentum) | "
-                        f"RSI: {rsi_current:.2f} (falling, <30) | "
-                        f"MACD: {macd_line:.6f} (falling, <-100) | "
+                        f"RSI: {rsi_current:.2f} (falling, <35) | "
+                        f"MACD: {macd_line:.6f} (falling, <-80) | "
+                        f"Squeeze: OFF"
+                    )
+                elif pullback_short:
+                    logger.info(
+                        f"📉 4H SHORT (Pullback) | "
+                        f"RSI: {rsi_current:.2f} (mid, falling) | "
+                        f"MACD: {macd_line:.6f} (<-50) | "
                         f"Squeeze: OFF"
                     )
                 else:
