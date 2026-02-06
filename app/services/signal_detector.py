@@ -657,6 +657,7 @@ class SignalDetector:
                 time.sleep(0.2)
 
         return results
+        
     def get_active_signals(self, symbols: List[str], timeframes: List[str] = None) -> List[Dict]:
         """Get only signals with active recommendations"""
         if timeframes is None:
