@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 from .indicators import TechnicalIndicators
 from ..utils.core_utils import ErrorHandler
 from ..utils.data_types import DataConverter
+from .signal_history_manager import SignalHistoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class SignalDetector:
         # Get configuration from ConfigManager
         self.risk_management = self._load_risk_config()
         self.indicator_settings = self._load_indicator_config()
+        self.signal_history = SignalHistoryManager()
         
         logger.info("✅ SignalDetector initialized - CONSERVATIVE MODE")
     
@@ -609,12 +611,52 @@ class SignalDetector:
             for timeframe in timeframes:
                 logger.info(f"🔍 Scanning {symbol} on {timeframe}")
                 result = self.analyze_symbol(symbol, timeframe)
-                if result:
-                    results.append(result)
+                
+                # ========================================
+                # 🆕 Check 1D signal history before adding
+                # ========================================
+                if result and timeframe == "1d":
+                    signals = result.get("signals", {})
+                    current_price = result.get("current_price", 0)
+                    
+                    if signals.get("buy"):
+                        signal_type = "LONG"
+                    elif signals.get("short"):
+                        signal_type = "SHORT"
+                    else:
+                        signal_type = None
+                    
+                    # Check if should notify
+                    if signal_type:
+                        should_notify = self.signal_history.should_notify(
+                            symbol, timeframe, signal_type, current_price
+                        )
+                        
+                        if should_notify:
+                            # Record signal
+                            self.signal_history.record_signal(
+                                symbol, timeframe, signal_type, current_price
+                            )
+                            # Clear opposite signal
+                            self.signal_history.clear_opposite_signal(
+                                symbol, timeframe, signal_type
+                            )
+                            # Add to results
+                            results.append(result)
+                            logger.info(f"✅ NEW 1D signal: {symbol} {signal_type}")
+                        else:
+                            logger.debug(f"⏭️ SKIP 1D signal: {symbol} {signal_type} (already notified)")
+                    else:
+                        # No signal, still add to results for tracking
+                        results.append(result)
+                else:
+                    # 4H or other timeframes - add normally
+                    if result:
+                        results.append(result)
+                
                 time.sleep(0.2)
 
         return results
-
     def get_active_signals(self, symbols: List[str], timeframes: List[str] = None) -> List[Dict]:
         """Get only signals with active recommendations"""
         if timeframes is None:
