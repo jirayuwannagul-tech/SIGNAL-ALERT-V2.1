@@ -77,7 +77,7 @@ class SignalDetector:
             # Get data from DataManager
             df = self.data_manager.get_klines(symbol, timeframe, limit=100)
 
-            df_1d = self.data_manager.get_klines(symbol, "1d", limit=50)
+            df_1d = self.data_manager.get_klines(symbol, "1d", limit=100)
             trend_1d = self._detect_signals_improved_fixed(None, "1d", df_1d)
 
             if df is None:
